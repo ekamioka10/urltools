@@ -1,4 +1,5 @@
 #include "parsing.h"
+#include <regex>
 
 std::string parsing::string_tolower(std::string str){
   unsigned int input_size = str.size();
@@ -31,14 +32,15 @@ std::vector < std::string > parsing::domain_and_port(std::string& url){
   // Check for the presence of user authentication info. If it exists, dump it.
   // Use a query-check here because some people put @ info in params, baaah
   std::size_t f_param = url.find("?");
+  // Extract auth credentials if they exist
   std::size_t auth;
-  if(f_param != std::string::npos){
-    auth = url.substr(0, f_param).find("@");
-  } else {
-    auth = url.find("@");
-  }
-  if(auth != std::string::npos){
-    url = url.substr(auth+1);
+  std::regex rx ("\\w+:\\w+@(.*)");
+  std::smatch matches;
+  std::string url_search = url.substr(0, f_param);
+  if(std::regex_search( url_search, matches, rx )){
+    for( std::size_t index = 1; index < matches.size(); ++index ){
+      url = matches[ index ];
+    }
   }
   
   // ID IPv6(?)
@@ -121,7 +123,7 @@ std::string parsing::path(std::string& url){
     url = url.substr(fragment);
     return output;
   }
-
+  
   output = url.substr(0,path);
   url = url.substr(path+1);
   return output;
@@ -164,7 +166,7 @@ CharacterVector parsing::url_to_vector(std::string url){
   std::string s = scheme(url_ptr);
   
   holding = domain_and_port(url_ptr);
-
+  
   //Run
   output[0] = check_parse_out(string_tolower(s));
   output[1] = check_parse_out(string_tolower(holding[0]));
@@ -237,7 +239,7 @@ DataFrame parsing::parse_to_df(CharacterVector& urls_ptr){
   CharacterVector paths(input_size);
   CharacterVector parameters(input_size);
   CharacterVector fragments(input_size);
-
+  
   for(unsigned int i = 0; i < input_size; i++){
     if((i % 10000) == 0){
       Rcpp::checkUserInterrupt();
@@ -348,7 +350,7 @@ CharacterVector set_component_(CharacterVector urls, int component,
   } else {
     Rcpp::stop("The number of new values must either be 1, or match the number of URLs");
   }
-
+  
   return output;
 }
 
@@ -388,7 +390,7 @@ CharacterVector set_component_r(CharacterVector urls, int component,
       if((i % 10000) == 0){
         Rcpp::checkUserInterrupt();
       }
-        
+      
       output[i] = parsing::set_component(Rcpp::as<std::string>(urls[i]), component, to_use, false);
     }
     // If we've got multiple values, it's just a rejigging of the same
